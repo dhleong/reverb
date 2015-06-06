@@ -1,13 +1,14 @@
 {
   "name": "reverb",
   "version": "0.1.0",
-  "description": "Client library for Amazon Echo",
+  "description": "Push-based client library for Amazon Echo",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
-    "echo"
+    "echo",
+    "alexa"
   ],
   "author": "Daniel Leong",
   "license": "ISC",

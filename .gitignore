@@ -1,2 +1,4 @@
 orig/
 test.js
+*.swp
+node_modules*

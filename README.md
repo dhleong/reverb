@@ -13,7 +13,7 @@ fast and lightweight on both your network and your machine.
 
 ### Usage
 
-*Will be available on NPM when it's a bit more usable*
+[![NPM](https://nodei.co/npm/reverb.png?mini=true)](https://nodei.co/npm/reverb/)
 
 For now, Reverb requires you to get extract some data by hand.
 These are the "Cookie" header and the device serial number. These

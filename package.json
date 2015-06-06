@@ -12,6 +12,9 @@
   "author": "Daniel Leong",
   "license": "ISC",
   "dependencies": {
+    "lodash": "^3.9.3",
+    "q": "^1.4.1",
+    "request": "^2.57.0",
     "ws": "^0.7.2"
   }
 }

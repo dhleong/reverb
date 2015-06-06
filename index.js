@@ -3,6 +3,9 @@
 var util = require('util')
   , events = require('events')
   , WebSocket = require('ws') // jshint ignore:line
+  , _ = require('lodash')
+
+  , ActivityFetcher = require('./lib/activity')
   , Echo = require('./lib/echolib')
   , Channels = Echo.Channels
 
@@ -19,37 +22,50 @@ var util = require('util')
  * The main entry into the library
  */
 function Reverb(opts) {
-    var url = 'wss://dp-gw-na-js.amazon.com/'
-        + '?x-amz-device-type=' + DEVICE_TYPE 
-        + '&x-amz-device-serial=' + opts.serial;
+    opts = _.extend({
+        push_host: 'dp-gw-na-js.amazon.com'
+      , origin: 'http://echo.amazon.com'
+    }, opts);
+
+    if (!opts.serial) throw new Error("`serial` is required");
+    if (!opts.cookie) throw new Error("`cookie` is required");
+
+    this.log = opts.debug 
+        ? function() { console.log.apply(console, arguments); }
+        : function() {};
 
     this._messageHandlers = [];
+    this._activityFetcher = new ActivityFetcher(opts);
+
+    var url = 'wss://' + opts.push_host + '/'
+        + '?x-amz-device-type=' + DEVICE_TYPE 
+        + '&x-amz-device-serial=' + opts.serial;
 
     var self = this;
     var ws = this.ws = new WebSocket(url, {
         headers: {
             Cookie: opts.cookie
         }
-      , origin: 'http://echo.amazon.com'
+      , origin: opts.origin
       , rejectUnauthorized: false
     });
     ws.on('open', function open() {
-        console.log("Opened!");
+        self.log("Opened!");
+        self.emit('open', self);
 
+        // begin the handshake
         self.initTuningHandshake();
     })
     ws.on('error', function error(err) {
-        console.log("ERROR:", err);
+        self.log("ERROR:", err);
+        self.emit('error', err);
     });
     ws.on('close', function close(code, message) {
+        self.emit('close', code, message);
         console.log("Disconnected", code, message);
         this._messageHandlers = [];
     });
     ws.on('message', self.onMessage.bind(self));
-
-    this.log = opts.debug 
-        ? function() { console.log.apply(console, arguments); }
-        : function() {};
 }
 util.inherits(Reverb, events.EventEmitter);
 
@@ -116,18 +132,19 @@ Reverb.prototype.initTuningHandshake = function() {
         self.send(proto, JSON.stringify(data));
         self.log("Agreed to A:H protocol");
 
+        // prepare the protocol and finish the handshake
         var params = {};
         Object.keys(data.parameters).forEach(function(param) {
             var name = param.substr(param.indexOf('.') + 1);
             params[name] = data.parameters[name];
         });
 
-        self.register(new Echo.AlphaProtocolHandler(params, Echo.HexCodec));
+        self._register(new Echo.AlphaProtocolHandler(params, Echo.HexCodec));
     });
 }
 
 /** Register the connection to receive events */
-Reverb.prototype.register = function(proto) {
+Reverb.prototype._register = function(proto) {
 
     var message = Echo.jsonToAb({
         command: "REGISTER_CONNECTION"
@@ -143,7 +160,8 @@ Reverb.prototype.register = function(proto) {
     // now wrap it in our outer protocol
     var wrapped = proto.encodeMessage(encoded, Channels.GW_CHANNEL);
     this.send(wrapped);
-    console.log("Ready");
+    this.emit('ready', self);
+    this.log("Ready");
 
     var self = this;
     this.addMessageListener(proto, function(gwPacket) {
@@ -160,15 +178,29 @@ Reverb.prototype.onGatewayCommand = function(command) {
 
     if (command.command == 'PUSH_ACTIVITY') {
         var body = JSON.parse(command.payload);
-        var key = body.key;
-        var userId = key.registeredUserId;
-        var activityId = key.entryId;
-        this.onActivity(userId, activityId);
+        this.onActivity({
+            id: body.key.entryId
+          , user: body.key.registeredUserId
+        });
     }
 }
 
-Reverb.prototype.onActivity = function(userId, activityId) {
-    this.log("<< Activity", userId, activityId);
+Reverb.prototype.onActivity = function(activity) {
+    this.log("<< Activity", activity);
+    if (!this.listeners('activity').length) {
+        // no listeners; don't bother fetching
+        return;
+    }
+
+    this.log("Resolving activity...");
+    var self = this;
+    this._activityFetcher.fetch(activity)
+    .then(function(resolved) {
+        self.log("<< RESOLVED activity", resolved);
+        self.emit('activity', resolved);
+    }, function(err) {
+        console.warn("Failed to resolve activity", err);
+    });
 }
 
 Reverb.prototype.send = function(protocol, message) {

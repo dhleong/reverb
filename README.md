@@ -1,0 +1,65 @@
+Reverb
+======
+
+*Is there an Echo in here?*
+
+## What?
+
+Reverb is an open source library for creating custom interactions
+with the Amazon Echo. Unlike existing solutions, Reverb uses a
+true "push"-style interaction and does not rely on using a 
+simulated or real web browser behind the scenes. This makes it
+fast and lightweight on both your network and your machine.
+
+### Usage
+
+*Will be available on NPM when it's a bit more usable*
+
+For now, Reverb requires you to get extract some data by hand.
+These are the "Cookie" header and the device serial number. These
+can both be easily acquired using the Developer Tools that come
+with Chrome. Simply open [the Echo web app](http://echo.amazon.com)
+and open the Network tab of the developer tools. Click on the
+Filter icon (it looks a bit like a funnel) and filter down to
+"WebSockets." Then, refresh the page. 
+
+There should be a single entry in the list pointing to 
+`dp-gw-na-js.amazon.com`. Select that and go to the "Headers" tab.
+The serial number you want will be the `x-amz-device-serial` 
+parameter under "Query String Parameters," and the "Cookie"
+is the (potentially huge) string next to `Cookie:` under 
+"Request Headers."
+
+Now that you have those, it's simple to get access to the 
+Echo's transcriptions of your requests:
+
+```javascript
+var Reverb = require('reverb');
+new Reverb({
+    cookie: // The Cookie retrieved above
+  , serial: // The serial retrieved above
+}).on('ready', function() {
+    // this is emitted when the connection is
+    //  established and the hands have been shaked
+    console.log("Ready!");
+}).on('activity', function(activity) {
+    // parse the transcription and do something
+    //  with it here
+    console.log("You said:", activity.summary);
+});
+```
+
+### Future Work
+
+* Provide an easy mechanism for authenticating
+* Perhaps, provide an "Action Dispatcher" to make parsing the activity text easier
+* Perhaps, provide a useful `-g` install
+    * Plugins could be dropped into a folder
+
+## Why?
+
+The Amazon Echo's voice capabilities are truly amazing, but
+they have yet to provide a proper API for extending its
+capabilities. I was not satisfied with the "poll"-style 
+mechanism used in existing solutions and wanted to see if
+there was something better.

@@ -49,6 +49,10 @@ new Reverb({
 });
 ```
 
+Note that, as with other solutions, you will have to append
+"cancel" or "stop" to the end of your custom commands to 
+prevent Echo from trying to process it.
+
 ### Future Work
 
 * Provide an easy mechanism for authenticating

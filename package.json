@@ -1,10 +1,14 @@
 {
   "name": "reverb",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Push-based client library for Amazon Echo",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://github.com/dhleong/reverb"
   },
   "keywords": [
     "echo",
@@ -12,6 +16,10 @@
   ],
   "author": "Daniel Leong",
   "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/dhleong/reverb/issues"
+  },
+  "homepage": "https://github.com/dhleong/reverb",
   "dependencies": {
     "lodash": "^3.9.3",
     "q": "^1.4.1",

@@ -46,6 +46,9 @@ function Reverb(opts) {
                 if (notifications[i].status == "ON") {
                     self.addTimer(notifications[i])
                 }
+            } else if (notifications[i].type == "Alarm") {
+                self.log("Got an alarm")
+                self.setAlarm(notifications[i])
             }
         }
     });
@@ -194,15 +197,13 @@ Reverb.prototype.onGatewayCommand = function(command) {
             id: body.key.entryId
           , user: body.key.registeredUserId
         });
-    }
-    else if (command.command == 'PUSH_NOTIFICATION_CHANGE') {
+    } else if (command.command == 'PUSH_NOTIFICATION_CHANGE') {
         var body = JSON.parse(command.payload);
         if (body.notificationId == "t1") {
             this.onTimer({
                 id: body.notificationId
             });
-        }
-        else if (body.notificationId == "a1") {
+        } else if (body.notificationId == "a1") {
             this.onAlarm({
                 id: body.notificationId
             });
@@ -242,14 +243,39 @@ Reverb.prototype.onTimer = function(notification) {
         if (resolved.status == "ON") {
             self.addTimer(resolved)
             self.emit('timerStart', resolved);
-        }
-        else if (resolved.status == "OFF") {
+        } else if (resolved.status == "OFF") {
             self.removeTimer(resolved)
             self.emit('timerRemove', resolved);
-        }
-        else if (resolved.status == "PAUSED") {
+        } else if (resolved.status == "PAUSED") {
             self.pauseTimer(resolved)
             self.emit('timerPause', resolved);
+        }
+    }, function(err) {
+        console.warn("Failed to resolve timer", err);
+    });
+}
+
+Reverb.prototype.onAlarm = function(notification) {
+    this.log("<< Alarm", notification);
+    this.log("Resolving alarm...");
+    var self = this;
+    this._notificationFetcher.fetch(notification)
+    .then(function(resolved) {
+        self.log("<< RESOLVED notification", resolved);
+        if (resolved.status == "ON") {
+            if (self.alarm.status == "ON") {
+                self.emit('alarmUpdate', resolved);
+            } else {
+                self.emit('alarmSet', resolved);
+            }
+            self.setAlarm(resolved)
+        } else if (resolved.status == "OFF") {
+            if (self.alarm.status == "OFF") {
+                self.emit('alarmUpdate', resolved);
+            } else {
+                self.emit('alarmRemove', resolved);
+            }
+            self.setAlarm(resolved)
         }
     }, function(err) {
         console.warn("Failed to resolve timer", err);
@@ -287,6 +313,14 @@ Reverb.prototype.pauseTimer = function(timer) {
 Reverb.prototype.removeTimer = function(timer) {
     this.log("This should remove the timer.")
     clearTimeout(this.timer.timeoutId)
+}
+
+Reverb.prototype.setAlarm = function(alarm) {
+    this.log("Setting an alarm")
+    this.alarm = {
+        status: alarm.status
+      , alarmTime: alarm.alarmTime
+    }
 }
 
 module.exports = Reverb;

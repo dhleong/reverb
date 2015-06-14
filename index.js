@@ -6,6 +6,7 @@ var util = require('util')
   , _ = require('lodash')
 
   , ActivityFetcher = require('./lib/activity')
+  , NotificationFetcher = require('./lib/notification')
   , Echo = require('./lib/echolib')
   , Channels = Echo.Channels
 
@@ -36,6 +37,7 @@ function Reverb(opts) {
 
     this._messageHandlers = [];
     this._activityFetcher = new ActivityFetcher(opts);
+    this._notificationFetcher = new NotificationFetcher(opts);
 
     var url = 'wss://' + opts.push_host + '/'
         + '?x-amz-device-type=' + DEVICE_TYPE 
@@ -183,6 +185,19 @@ Reverb.prototype.onGatewayCommand = function(command) {
           , user: body.key.registeredUserId
         });
     }
+    else if (command.command == 'PUSH_NOTIFICATION_CHANGE') {
+        var body = JSON.parse(command.payload);
+        if (body.notificationId == "t1") {
+            this.onTimer({
+                id: body.notificationId
+            });
+        }
+        else if (body.notificationId == "a1") {
+            this.onAlarm({
+                id: body.notificationId
+            });
+        }
+    }
 }
 
 Reverb.prototype.onActivity = function(activity) {
@@ -200,6 +215,23 @@ Reverb.prototype.onActivity = function(activity) {
         self.emit('activity', resolved);
     }, function(err) {
         console.warn("Failed to resolve activity", err);
+    });
+}
+
+Reverb.prototype.onTimer = function(notification) {
+    this.log("<< Timer", notification);
+    if (!this.listeners('timer').length) {
+        // no listeners; don't bother fetching
+        return;
+    }
+    this.log("Resolving timer...");
+    var self = this;
+    this._notificationFetcher.fetch(notification)
+    .then(function(resolved) {
+        self.log("<< RESOLVED notification", resolved);
+        self.emit('timer', resolved);
+    }, function(err) {
+        console.warn("Failed to resolve timer", err);
     });
 }
 

@@ -46,6 +46,24 @@ new Reverb({
     // parse the transcription and do something
     //  with it here
     console.log("You said:", activity.summary);
+}).on('timerStart', function(timer) {
+    // do something when timers are started
+    console.log("timer started:", timer.remainingTime);
+}).on('timerPause', function(timer) {
+    // do somethign when timers are paused
+    console.log("timer paused:", timer.remainingTime);
+}).on('timerComplete', function(timer) {
+    // do something when timers complete
+    console.log("timer complete");
+}).on('alarmSet', function(alarm) {
+    // do something when alarms are set
+    console.log("alarm set:", alarm);
+}).on('alarmUpdate', function(alarm) {
+    // do something when alarms are changed
+    console.log("alarm time updated:", alarm.alarmTime);
+}).on('alarmRemove', function(alarm) {
+    // do something when alarmas are turned off
+    console.log("alarm unset");
 });
 ```
 

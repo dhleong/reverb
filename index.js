@@ -272,10 +272,11 @@ Reverb.prototype.onAlarm = function(notification) {
         } else if (resolved.status == "OFF") {
             if (self.alarm.status == "OFF") {
                 self.emit('alarmUpdate', resolved);
+                self.setAlarm(resolved)
             } else {
                 self.emit('alarmRemove', resolved);
+                self.removeAlarm(resolved)
             }
-            self.setAlarm(resolved)
         }
     }, function(err) {
         console.warn("Failed to resolve timer", err);
@@ -316,11 +317,28 @@ Reverb.prototype.removeTimer = function(timer) {
 }
 
 Reverb.prototype.setAlarm = function(alarm) {
+    var self = this;
+    var now = new Date().getTime()
+    var delta = alarm.alarmTime - now
     this.log("Setting an alarm")
+    // alarmTime / 1000 is the next time the alarm should fire
     this.alarm = {
         status: alarm.status
       , alarmTime: alarm.alarmTime
     }
+    this.log("Alarm in", delta / 1000, "seconds")
+    if (delta > 0 && alarm.status == "ON") {
+        this.log("Alarm active")
+        this.alarm.timeoutId = setTimeout(function() {
+            self.log("Alarm has completed")
+            self.emit('alarmComplete', alarm)
+        }, delta)
+    }
+}
+
+Reverb.prototype.removeAlarm = function(alarm) {
+    this.log("Clearing internal alarm")
+    clearTimeout(this.alarm.timeoutId)
 }
 
 module.exports = Reverb;

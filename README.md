@@ -61,6 +61,9 @@ new Reverb({
 }).on('alarmUpdate', function(alarm) {
     // do something when alarms are changed
     console.log("alarm time updated:", alarm.alarmTime);
+}).on('alarmComplete', function(alarm) {
+    // do something when alarms complete
+    console.log("alarm complete");
 }).on('alarmRemove', function(alarm) {
     // do something when alarmas are turned off
     console.log("alarm unset");

@@ -306,12 +306,12 @@ Reverb.prototype.addTimer = function(timer) {
 }
 
 Reverb.prototype.pauseTimer = function(timer) {
-    this.log("I should remove the timer because it is paused")
+    this.log("Clearing internal timer.")
     clearTimeout(this.timer.timeoutId)
 }
 
 Reverb.prototype.removeTimer = function(timer) {
-    this.log("This should remove the timer.")
+    this.log("Clearing internal timer.")
     clearTimeout(this.timer.timeoutId)
 }
 

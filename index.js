@@ -220,16 +220,24 @@ Reverb.prototype.onActivity = function(activity) {
 
 Reverb.prototype.onTimer = function(notification) {
     this.log("<< Timer", notification);
-    if (!this.listeners('timer').length) {
+/*    if (!this.listeners('timer').length) {
         // no listeners; don't bother fetching
         return;
-    }
+    } */
     this.log("Resolving timer...");
     var self = this;
     this._notificationFetcher.fetch(notification)
     .then(function(resolved) {
         self.log("<< RESOLVED notification", resolved);
-        self.emit('timer', resolved);
+		if (resolved.status == "ON") {
+			self.emit('timerStart', resolved);
+		}
+		else if (resolved.status == "OFF") {
+			self.emit('timerRemove', resolved);
+		}
+		else if (resolved.status == "PAUSED") {
+			self.emit('timerPause', resolved);
+		}
     }, function(err) {
         console.warn("Failed to resolve timer", err);
     });

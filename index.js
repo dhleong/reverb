@@ -30,6 +30,7 @@ function Reverb(opts) {
 
     if (!opts.serial) throw new Error("`serial` is required");
     if (!opts.cookie) throw new Error("`cookie` is required");
+    var self = this;
 
     this.log = opts.debug 
         ? function() { console.log.apply(console, arguments); }
@@ -37,13 +38,22 @@ function Reverb(opts) {
 
     this._messageHandlers = [];
     this._activityFetcher = new ActivityFetcher(opts);
-    this._notificationFetcher = new NotificationFetcher(opts);
+    this._notificationFetcher = new NotificationFetcher(opts, function(notifications){
+        self.log("Received", notifications.length, "notifications")
+        for (var i = 0; i < notifications.length; i++) {
+            if (notifications[i].type == "Timer") {
+                self.log("Got a timer")
+                if (notifications[i].status == "ON") {
+                    self.addTimer(notifications[i])
+                }
+            }
+        }
+    });
 
     var url = 'wss://' + opts.push_host + '/'
         + '?x-amz-device-type=' + DEVICE_TYPE 
         + '&x-amz-device-serial=' + opts.serial;
 
-    var self = this;
     var ws = this.ws = new WebSocket(url, {
         headers: {
             Cookie: opts.cookie
@@ -229,15 +239,18 @@ Reverb.prototype.onTimer = function(notification) {
     this._notificationFetcher.fetch(notification)
     .then(function(resolved) {
         self.log("<< RESOLVED notification", resolved);
-		if (resolved.status == "ON") {
-			self.emit('timerStart', resolved);
-		}
-		else if (resolved.status == "OFF") {
-			self.emit('timerRemove', resolved);
-		}
-		else if (resolved.status == "PAUSED") {
-			self.emit('timerPause', resolved);
-		}
+        if (resolved.status == "ON") {
+            self.addTimer(resolved)
+            self.emit('timerStart', resolved);
+        }
+        else if (resolved.status == "OFF") {
+            self.removeTimer(resolved)
+            self.emit('timerRemove', resolved);
+        }
+        else if (resolved.status == "PAUSED") {
+            self.pauseTimer(resolved)
+            self.emit('timerPause', resolved);
+        }
     }, function(err) {
         console.warn("Failed to resolve timer", err);
     });
@@ -251,6 +264,29 @@ Reverb.prototype.send = function(protocol, message) {
     } else {
         this.ws.send(protocol); // send directly
     }
+}
+
+Reverb.prototype.addTimer = function(timer) {
+    var self = this;
+    this.log("Adding a timer")
+    this.timer = {
+        status: timer.status
+      , remainingTime: timer.remainingTime
+    }
+    this.timer.timeoutId = setTimeout(function() {
+        self.log("Timer has completed")
+        self.emit('timerComplete', timer);
+    }, this.timer.remainingTime)
+}
+
+Reverb.prototype.pauseTimer = function(timer) {
+    this.log("I should remove the timer because it is paused")
+    clearTimeout(this.timer.timeoutId)
+}
+
+Reverb.prototype.removeTimer = function(timer) {
+    this.log("This should remove the timer.")
+    clearTimeout(this.timer.timeoutId)
 }
 
 module.exports = Reverb;

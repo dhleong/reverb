@@ -6,6 +6,7 @@ var util = require('util')
   , _ = require('lodash')
 
   , ActivityFetcher = require('./lib/activity')
+  , NotificationFetcher = require('./lib/notification')
   , Echo = require('./lib/echolib')
   , Channels = Echo.Channels
 
@@ -29,6 +30,7 @@ function Reverb(opts) {
 
     if (!opts.serial) throw new Error("`serial` is required");
     if (!opts.cookie) throw new Error("`cookie` is required");
+    var self = this;
 
     this.log = opts.debug 
         ? function() { console.log.apply(console, arguments); }
@@ -36,12 +38,25 @@ function Reverb(opts) {
 
     this._messageHandlers = [];
     this._activityFetcher = new ActivityFetcher(opts);
+    this._notificationFetcher = new NotificationFetcher(opts, function(notifications){
+        self.log("Received", notifications.length, "notifications")
+        for (var i = 0; i < notifications.length; i++) {
+            if (notifications[i].type == "Timer") {
+                self.log("Got a timer")
+                if (notifications[i].status == "ON") {
+                    self.addTimer(notifications[i])
+                }
+            } else if (notifications[i].type == "Alarm") {
+                self.log("Got an alarm")
+                self.setAlarm(notifications[i])
+            }
+        }
+    });
 
     var url = 'wss://' + opts.push_host + '/'
         + '?x-amz-device-type=' + DEVICE_TYPE 
         + '&x-amz-device-serial=' + opts.serial;
 
-    var self = this;
     var ws = this.ws = new WebSocket(url, {
         headers: {
             Cookie: opts.cookie
@@ -182,6 +197,17 @@ Reverb.prototype.onGatewayCommand = function(command) {
             id: body.key.entryId
           , user: body.key.registeredUserId
         });
+    } else if (command.command == 'PUSH_NOTIFICATION_CHANGE') {
+        var body = JSON.parse(command.payload);
+        if (body.notificationId == "t1") {
+            this.onTimer({
+                id: body.notificationId
+            });
+        } else if (body.notificationId == "a1") {
+            this.onAlarm({
+                id: body.notificationId
+            });
+        }
     }
 }
 
@@ -203,6 +229,60 @@ Reverb.prototype.onActivity = function(activity) {
     });
 }
 
+Reverb.prototype.onTimer = function(notification) {
+    this.log("<< Timer", notification);
+/*    if (!this.listeners('timer').length) {
+        // no listeners; don't bother fetching
+        return;
+    } */
+    this.log("Resolving timer...");
+    var self = this;
+    this._notificationFetcher.fetch(notification)
+    .then(function(resolved) {
+        self.log("<< RESOLVED notification", resolved);
+        if (resolved.status == "ON") {
+            self.addTimer(resolved)
+            self.emit('timerStart', resolved);
+        } else if (resolved.status == "OFF") {
+            self.removeTimer(resolved)
+            self.emit('timerRemove', resolved);
+        } else if (resolved.status == "PAUSED") {
+            self.pauseTimer(resolved)
+            self.emit('timerPause', resolved);
+        }
+    }, function(err) {
+        console.warn("Failed to resolve timer", err);
+    });
+}
+
+Reverb.prototype.onAlarm = function(notification) {
+    this.log("<< Alarm", notification);
+    this.log("Resolving alarm...");
+    var self = this;
+    this._notificationFetcher.fetch(notification)
+    .then(function(resolved) {
+        self.log("<< RESOLVED notification", resolved);
+        if (resolved.status == "ON") {
+            if (self.alarm.status == "ON") {
+                self.emit('alarmUpdate', resolved);
+            } else {
+                self.emit('alarmSet', resolved);
+            }
+            self.setAlarm(resolved)
+        } else if (resolved.status == "OFF") {
+            if (self.alarm.status == "OFF") {
+                self.emit('alarmUpdate', resolved);
+                self.setAlarm(resolved)
+            } else {
+                self.emit('alarmRemove', resolved);
+                self.removeAlarm(resolved)
+            }
+        }
+    }, function(err) {
+        console.warn("Failed to resolve timer", err);
+    });
+}
+
 Reverb.prototype.send = function(protocol, message) {
     if (message) {
         var encoded = protocol.encodeMessage(message);
@@ -211,6 +291,54 @@ Reverb.prototype.send = function(protocol, message) {
     } else {
         this.ws.send(protocol); // send directly
     }
+}
+
+Reverb.prototype.addTimer = function(timer) {
+    var self = this;
+    this.log("Adding a timer")
+    this.timer = {
+        status: timer.status
+      , remainingTime: timer.remainingTime
+    }
+    this.timer.timeoutId = setTimeout(function() {
+        self.log("Timer has completed")
+        self.emit('timerComplete', timer);
+    }, this.timer.remainingTime)
+}
+
+Reverb.prototype.pauseTimer = function(timer) {
+    this.log("Clearing internal timer.")
+    clearTimeout(this.timer.timeoutId)
+}
+
+Reverb.prototype.removeTimer = function(timer) {
+    this.log("Clearing internal timer.")
+    clearTimeout(this.timer.timeoutId)
+}
+
+Reverb.prototype.setAlarm = function(alarm) {
+    var self = this;
+    var now = new Date().getTime()
+    var delta = alarm.alarmTime - now
+    this.log("Setting an alarm")
+    // alarmTime / 1000 is the next time the alarm should fire
+    this.alarm = {
+        status: alarm.status
+      , alarmTime: alarm.alarmTime
+    }
+    this.log("Alarm in", delta / 1000, "seconds")
+    if (delta > 0 && alarm.status == "ON") {
+        this.log("Alarm active")
+        this.alarm.timeoutId = setTimeout(function() {
+            self.log("Alarm has completed")
+            self.emit('alarmComplete', alarm)
+        }, delta)
+    }
+}
+
+Reverb.prototype.removeAlarm = function(alarm) {
+    this.log("Clearing internal alarm")
+    clearTimeout(this.alarm.timeoutId)
 }
 
 module.exports = Reverb;

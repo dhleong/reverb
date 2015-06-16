@@ -1,6 +1,6 @@
 {
   "name": "reverb",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Push-based client library for Amazon Echo",
   "main": "index.js",
   "scripts": {

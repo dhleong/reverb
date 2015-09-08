@@ -1,3 +1,8 @@
+***With the public release of the [Alexa Skill Kit](https://developer.amazon.com/public/solutions/alexa/alexa-skills-kit/)
+this library is somewhat redundant. It will remain for educational purposes, and for anyone
+who wishes to listen to various events their Echo emits, 
+but I recommend my [expressive](https://github.com/dhleong/expressive) library for interacting with ASK***
+
 Reverb
 ======
 
